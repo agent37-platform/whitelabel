@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   MoreHorizontal,
   Play,
-  Radar,
   RotateCw,
   Square,
   Terminal,
@@ -106,22 +105,6 @@ export function AgentActionsMenu({
             </Button>
           </TooltipTrigger>
           <TooltipContent>Open the Hermes dashboard</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-              disabled={!running || opening === PORTS.missionControl}
-              onClick={() => openPort(PORTS.missionControl)}
-              aria-label="Open mission control"
-            >
-              <Radar className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Open mission control</TooltipContent>
         </Tooltip>
 
         <Tooltip>

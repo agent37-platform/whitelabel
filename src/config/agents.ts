@@ -23,7 +23,6 @@ export const DEFAULT_AGENT = {
 
 export const PORTS = {
   dashboard: 9119,
-  missionControl: 6969,
   terminal: 7681,
   files: 8080,
 } as const;
