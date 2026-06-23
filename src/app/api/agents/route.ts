@@ -1,6 +1,6 @@
 import { agent37 } from "@/lib/agent37";
 import { requireAdmin, requireMember, requireUser } from "@/lib/auth";
-import { DEFAULT_AGENT } from "@/config/agents";
+import { AGENT_TEMPLATES, DEFAULT_AGENT } from "@/config/agents";
 import { usdToMicros } from "@/lib/format";
 import { ApiError, handleError, json, readJson } from "@/lib/http";
 import type { Agent, AgentRow, MergedAgent } from "@/lib/types";
@@ -75,14 +75,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { supabase, user } = await requireUser();
-    // Shape is fixed server-side (DEFAULT_AGENT); the client only picks the workspace.
-    const body = await readJson<{ workspace_id?: string }>(request);
+    // Shape is fixed server-side (DEFAULT_AGENT); the client picks the workspace and the agent type.
+    const body = await readJson<{ workspace_id?: string; template?: string }>(request);
 
     const workspaceId = body.workspace_id;
     if (!workspaceId) throw new ApiError(400, "invalid_request", "workspace_id is required");
     await requireAdmin(supabase, workspaceId, user.id);
 
-    const template = await resolveTemplate();
+    const template =
+      body.template && AGENT_TEMPLATES.includes(body.template)
+        ? body.template
+        : await resolveTemplate();
 
     const agent = await agent37.createAgent({
       template,
