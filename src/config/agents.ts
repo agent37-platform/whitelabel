@@ -21,6 +21,32 @@ export const DEFAULT_AGENT = {
   monthlyCapUsd: 5,
 } as const;
 
+export interface AgentTypeOption {
+  id: string;
+  template: string;
+  label: string;
+  description: string;
+  recommended?: boolean;
+}
+
+export const AGENT_TYPES: AgentTypeOption[] = [
+  {
+    id: "hermes",
+    template: "agent37-hermes",
+    label: "Hermes",
+    description: "General agent: chat, browsing, code, files.",
+    recommended: true,
+  },
+  {
+    id: "openclaw",
+    template: "agent37-openclaw",
+    label: "OpenClaw",
+    description: "General agent: headless browser, code, files.",
+  },
+];
+
+export const AGENT_TEMPLATES = AGENT_TYPES.map((a) => a.template);
+
 export const PORTS = {
   dashboard: 9119,
   terminal: 7681,
