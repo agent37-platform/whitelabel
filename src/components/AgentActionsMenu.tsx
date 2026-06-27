@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   ArrowDownToLine,
+  Blocks,
   FolderOpen,
   Gauge,
   LayoutDashboard,
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BudgetDialog } from "@/components/BudgetDialog";
+import { IntegrationsDialog } from "@/components/IntegrationsDialog";
 
 export function AgentActionsMenu({
   agent,
@@ -49,6 +51,7 @@ export function AgentActionsMenu({
   const transitional = isTransitional(agent.live_status);
 
   const [budgeting, setBudgeting] = useState(false);
+  const [integrating, setIntegrating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState<number | null>(null);
@@ -154,6 +157,21 @@ export function AgentActionsMenu({
           <TooltipContent>Usage</TooltipContent>
         </Tooltip>
 
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => setIntegrating(true)}
+              aria-label="Connect apps"
+            >
+              <Blocks className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Connect apps</TooltipContent>
+        </Tooltip>
+
         {isAdmin && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -232,6 +250,7 @@ export function AgentActionsMenu({
       </TooltipProvider>
 
       <BudgetDialog open={budgeting} onOpenChange={setBudgeting} agentId={agent.agent37_id} />
+      <IntegrationsDialog open={integrating} onOpenChange={setIntegrating} agentId={agent.agent37_id} />
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}

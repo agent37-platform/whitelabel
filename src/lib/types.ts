@@ -90,6 +90,44 @@ export interface Usage {
   };
 }
 
+export interface IntegrationToolkit {
+  slug: string;
+  name: string;
+  description: string | null;
+  logo: string | null;
+  enabled: boolean;
+  isNoAuth: boolean;
+  authSchemes: string[];
+}
+
+export interface IntegrationToolkitsResult {
+  items: IntegrationToolkit[];
+}
+
+// Composio's connected-account shape, as returned by the v1 connections endpoint.
+export interface IntegrationConnection {
+  id: string;
+  status: string;
+  userId?: string | null;
+  toolkitSlug?: string | null;
+  toolkitName?: string | null;
+  authConfigId?: string | null;
+  authScheme?: string | null;
+  isDisabled?: boolean;
+  createdAt?: number | null;
+  updatedAt?: number | null;
+}
+
+export interface IntegrationConnectionsResult {
+  connections: IntegrationConnection[];
+}
+
+export interface IntegrationConnectResult {
+  toolkit: string;
+  connectedAccountId: string;
+  redirectUrl: string;
+}
+
 export interface MergedAgent extends AgentRow {
   live_status: string | null;
   status_reason: Agent["status_reason"];
