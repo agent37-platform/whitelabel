@@ -2,12 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, LogOut, Settings, Users } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { LayoutGrid, Settings, Users } from "lucide-react";
 import { branding } from "@/config/branding";
-import { useWorkspace } from "@/components/WorkspaceProvider";
-import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
-import { Button } from "@/components/ui/button";
+import { AccountMenu } from "@/components/AccountMenu";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -18,12 +15,6 @@ const NAV = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { userEmail } = useWorkspace();
-
-  async function signOut() {
-    await createClient().auth.signOut();
-    window.location.href = "/login";
-  }
 
   return (
     <div className="flex min-h-screen">
@@ -34,10 +25,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <img src={branding.logoUrl} alt="" className="h-6 w-6 rounded" />
           ) : null}
           <span className="truncate font-semibold">{branding.appName}</span>
-        </div>
-
-        <div className="mt-4">
-          <WorkspaceSwitcher />
         </div>
 
         <nav className="mt-6 flex flex-col gap-1">
@@ -60,12 +47,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-auto space-y-2 pt-4">
-          <div className="truncate px-3 text-xs text-muted-foreground">{userEmail}</div>
-          <Button variant="ghost" className="w-full justify-start" onClick={signOut}>
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </Button>
+        {/* Account + workspace switcher, pinned to the bottom near the user's identity. */}
+        <div className="mt-auto border-t pt-3">
+          <AccountMenu />
         </div>
       </aside>
 

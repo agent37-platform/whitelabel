@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowUp, Loader2, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AgentMenu } from "./AgentMenu";
 import { AttachButton, AttachmentTray } from "./Attachments";
-import { useChatContext } from "./ChatProvider";
 import { EffortMenu } from "./EffortMenu";
 import { ModelMenu } from "./ModelMenu";
 import type { ChatAttachments } from "./useChatAttachments";
@@ -26,7 +24,6 @@ interface Props {
 }
 
 export function ChatComposer({ agentId, isStreaming, att, onSend, onStop, large = false, focusToken = 0 }: Props) {
-  const { agents } = useChatContext();
   const [text, setText] = useState("");
   // model + provider are always chosen together (one selection); effort is independent. Group
   // them as the composer's outgoing ChatSettings so send is just `{ ...settings, files }`.
@@ -105,8 +102,6 @@ export function ChatComposer({ agentId, isStreaming, att, onSend, onStop, large 
       <div className="flex items-center gap-2 px-3 pb-3">
         <div className="flex min-w-0 items-center gap-1.5">
           <AttachButton onFiles={att.addFiles} disabled={isStreaming} />
-          {/* The active agent rides the URL; switching here navigates the whole workspace to it. */}
-          {agents.length > 1 && <AgentMenu agents={agents} activeAgentId={agentId} disabled={isStreaming} />}
           {groups.length > 0 && (
             <ModelMenu
               groups={groups}

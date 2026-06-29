@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { agentTabPath, type AgentTab } from "@/lib/dashboard-tabs";
 import { statusVariant } from "@/lib/format";
 import type { MergedAgent } from "@/lib/types";
@@ -11,7 +11,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -31,7 +30,8 @@ function StatusDot({ status }: { status?: string | null }) {
 
 // THE control that scopes the whole per-agent workspace. URL-bound: selecting another agent
 // navigates to the same tab on that agent (router.push), which remounts the workspace around the
-// new active agent. Modeled on WorkspaceSwitcher's dropdown styling.
+// new active agent. Sits at the TOP of the per-agent sidebar; the workspace/account switcher
+// (AccountMenu) sits at the bottom.
 export function ActiveAgentSwitcher({
   agents,
   activeAgentId,
@@ -68,11 +68,6 @@ export function ActiveAgentSwitcher({
             {a.agent37_id === activeAgentId && <Check className="h-4 w-4" />}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard")}>
-          <Plus className="h-4 w-4" />
-          New agent
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

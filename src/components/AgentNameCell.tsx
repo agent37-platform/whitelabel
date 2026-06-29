@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Check, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
@@ -12,10 +13,14 @@ export function AgentNameCell({
   agent,
   canEdit,
   onRenamed,
+  href,
 }: {
   agent: MergedAgent;
   canEdit: boolean;
   onRenamed: () => void;
+  // When set, the (display-mode) name links here — e.g. the agent's chat tab. The pencil stays a
+  // separate control so opening the agent and renaming it don't collide.
+  href?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(agent.name ?? "");
@@ -61,7 +66,10 @@ export function AgentNameCell({
   }
 
   return (
-    <div className="group/name max-w-[18rem]">
+    // Fixed width (not max-): the column must reserve the same space whether it's showing the name +
+    // pencil or the wider input + ✓/✗, so entering edit mode doesn't grow the column and shove every
+    // other column to the right.
+    <div className="group/name w-64">
       {editing ? (
         <div className="flex items-center gap-1">
           <Input
@@ -100,14 +108,26 @@ export function AgentNameCell({
         </div>
       ) : (
         <div className="flex items-center gap-1.5">
-          <span
-            className={`min-w-0 truncate ${
-              agent.name?.trim() ? "font-medium" : "italic text-muted-foreground"
-            }`}
-            title={agent.name?.trim() || "Untitled agent"}
-          >
-            {agent.name?.trim() || "Untitled agent"}
-          </span>
+          {href ? (
+            <Link
+              href={href}
+              className={`min-w-0 truncate hover:underline ${
+                agent.name?.trim() ? "font-medium" : "italic text-muted-foreground"
+              }`}
+              title={agent.name?.trim() || "Untitled agent"}
+            >
+              {agent.name?.trim() || "Untitled agent"}
+            </Link>
+          ) : (
+            <span
+              className={`min-w-0 truncate ${
+                agent.name?.trim() ? "font-medium" : "italic text-muted-foreground"
+              }`}
+              title={agent.name?.trim() || "Untitled agent"}
+            >
+              {agent.name?.trim() || "Untitled agent"}
+            </span>
+          )}
           {canEdit && (
             <Button
               ref={triggerRef}
