@@ -1,5 +1,5 @@
 {
-  "name": "agent37-whitelabel",
+  "name": "agent37-starter-kit",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release:agent": "bash template/release.sh",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",
@@ -20,10 +22,11 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
-    "next": "^15.3.0",
+    "next": "^16.2.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sonner": "^1.7.4",
+    "streamdown": "^2.5.0",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {

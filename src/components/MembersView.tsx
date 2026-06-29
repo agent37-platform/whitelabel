@@ -178,47 +178,40 @@ export function MembersView() {
           {isAdmin && invitations.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-sm font-medium text-muted-foreground">Pending invitations</h2>
-              <div className="overflow-hidden rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-2.5 font-medium">Invite link</th>
-                      <th className="px-4 py-2.5 font-medium">Created</th>
-                      <th className="px-4 py-2.5" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invitations.map((inv) => (
-                      <tr key={inv.token} className="border-t">
-                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                          …/invite/{inv.token.slice(0, 8)}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.created_at)}</td>
-                        <td className="px-4 py-3 text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Copy invite link"
-                            onClick={() => {
-                              navigator.clipboard.writeText(inviteUrl(inv.token));
-                              toast.success("Link copied");
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Revoke invite"
-                            onClick={() => revokeInvite(inv.token)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="divide-y rounded-lg border">
+                {invitations.map((inv) => (
+                  <div key={inv.token} className="space-y-2 p-4">
+                    <div className="flex items-center gap-2">
+                      <code className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                        {inviteUrl(inv.token)}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(inviteUrl(inv.token));
+                          toast.success("Link copied");
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy link
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        aria-label="Revoke invite"
+                        onClick={() => revokeInvite(inv.token)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Created {formatDate(inv.created_at)} · anyone with this link joins as an admin
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           )}

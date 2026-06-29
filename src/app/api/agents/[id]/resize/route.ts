@@ -1,5 +1,5 @@
 import { agent37 } from "@/lib/agent37";
-import { getAgentRow, requireAdmin, requireUser } from "@/lib/auth";
+import { requireAgentAccess } from "@/lib/auth";
 import { ApiError, handleError, json, readJson } from "@/lib/http";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -7,9 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, { params }: Ctx) {
   try {
     const { id } = await params;
-    const { supabase, user } = await requireUser();
-    const row = await getAgentRow(supabase, id);
-    await requireAdmin(supabase, row.workspace_id, user.id);
+    const { db } = await requireAgentAccess(id, "admin");
 
     const body = await readJson<{ cpu?: number; memory?: number; disk?: number }>(request);
     if (!body.cpu && !body.memory && !body.disk) {
@@ -17,7 +15,7 @@ export async function POST(request: Request, { params }: Ctx) {
     }
 
     const result = await agent37.resize(id, body);
-    await supabase
+    await db
       .from("agents")
       .update({
         cpu: result.resources.cpu,

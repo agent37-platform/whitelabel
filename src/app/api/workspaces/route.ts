@@ -4,8 +4,8 @@ import type { Role, Workspace, WorkspaceWithRole } from "@/lib/types";
 
 export async function GET() {
   try {
-    const { supabase, user } = await requireUser();
-    const { data, error } = await supabase
+    const { db, user } = await requireUser();
+    const { data, error } = await db
       .from("memberships")
       .select("role, workspaces(*)")
       .eq("user_id", user.id);
@@ -28,12 +28,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { supabase, user } = await requireUser();
+    const { db, user } = await requireUser();
     const { name } = await readJson<{ name?: string }>(request);
     const trimmed = (name || "").trim();
     if (!trimmed) throw new ApiError(400, "invalid_request", "Workspace name is required");
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("workspaces")
       .insert({ name: trimmed, owner_id: user.id })
       .select("*")

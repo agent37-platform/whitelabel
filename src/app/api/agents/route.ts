@@ -3,11 +3,25 @@ import { requireAdmin, requireMember, requireUser } from "@/lib/auth";
 import { AGENT_TEMPLATES, DEFAULT_AGENT } from "@/config/agents";
 import { usdToMicros } from "@/lib/format";
 import { ApiError, handleError, json, readJson } from "@/lib/http";
-import type { Agent, AgentRow, MergedAgent } from "@/lib/types";
+import type { Agent, AgentRow, MergedAgent, Template } from "@/lib/types";
+
+// The image catalog barely changes, but the dashboard polls this route every 5s while any agent is
+// transitioning — so cache the template list briefly rather than re-fetching /templates on every
+// poll (and on create). Module-scoped + best-effort: a stale entry only delays an agent's
+// `update_available` flag by at most the TTL.
+let templateCache: { at: number; data: Template[] } | null = null;
+const TEMPLATES_TTL_MS = 60_000;
+
+async function getTemplates(): Promise<Template[]> {
+  if (templateCache && Date.now() - templateCache.at < TEMPLATES_TTL_MS) return templateCache.data;
+  const { data } = await agent37.listTemplates();
+  templateCache = { at: Date.now(), data };
+  return data;
+}
 
 async function resolveTemplate(): Promise<string | undefined> {
   try {
-    const { data } = await agent37.listTemplates();
+    const data = await getTemplates();
     const preferred = data.find((t) => t.name === DEFAULT_AGENT.template);
     if (preferred) return preferred.name;
     const builtin = data.find((t) => t.scope === "system");
@@ -19,13 +33,13 @@ async function resolveTemplate(): Promise<string | undefined> {
 
 export async function GET(request: Request) {
   try {
-    const { supabase, user } = await requireUser();
+    const { db, user } = await requireUser();
     const workspaceId = new URL(request.url).searchParams.get("workspace");
     if (!workspaceId) throw new ApiError(400, "invalid_request", "workspace query param is required");
 
-    const role = await requireMember(supabase, workspaceId, user.id);
+    const role = await requireMember(db, workspaceId, user.id);
 
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await db
       .from("agents")
       .select("*")
       .eq("workspace_id", workspaceId)
@@ -36,21 +50,23 @@ export async function GET(request: Request) {
     let templateImages = new Map<string, string>();
     const [liveRes, tmplRes] = await Promise.allSettled([
       agent37.listAgents(),
-      agent37.listTemplates(),
+      getTemplates(),
     ]);
     if (liveRes.status === "fulfilled") {
       live = new Map(liveRes.value.data.map((i) => [i.id, i]));
     }
     if (tmplRes.status === "fulfilled") {
       templateImages = new Map(
-        tmplRes.value.data.filter((t) => t.image_ref).map((t) => [t.name, t.image_ref])
+        tmplRes.value.filter((t) => t.image_ref).map((t) => [t.name, t.image_ref])
       );
     }
 
     const agents: MergedAgent[] = (rows as AgentRow[]).map((row) => {
       const l = live.get(row.agent37_id);
       if (l && l.status !== row.status) {
-        supabase.rpc("set_agent_status", { p_agent37_id: row.agent37_id, p_status: l.status }).then(() => {});
+        // Best-effort mirror sync. Authorized already: these rows belong to workspaceId, which the
+        // caller is a member of (requireMember above).
+        db.from("agents").update({ status: l.status }).eq("agent37_id", row.agent37_id).then(() => {});
       }
       const latestImage = l ? templateImages.get(l.template) : undefined;
       return {
@@ -74,13 +90,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { supabase, user } = await requireUser();
-    // Shape is fixed server-side (DEFAULT_AGENT); the client picks the workspace and the agent type.
+    const { db, user } = await requireUser();
+    // Shape is fixed server-side (DEFAULT_AGENT); the client picks the workspace and agent type.
     const body = await readJson<{ workspace_id?: string; template?: string }>(request);
 
     const workspaceId = body.workspace_id;
     if (!workspaceId) throw new ApiError(400, "invalid_request", "workspace_id is required");
-    await requireAdmin(supabase, workspaceId, user.id);
+    await requireAdmin(db, workspaceId, user.id);
+
+    // Paywall/entitlement seam: a fork can gate agent creation here, e.g.
+    // if (!(await canCreateAgent(db, workspaceId))) throw new ApiError(403, "forbidden", "Agent creation is not enabled for this workspace.");
 
     const template =
       body.template && AGENT_TEMPLATES.includes(body.template)
@@ -99,7 +118,7 @@ export async function POST(request: Request) {
       budget: { monthly_cap_micros: usdToMicros(DEFAULT_AGENT.monthlyCapUsd) },
     });
 
-    const { error } = await supabase.from("agents").insert({
+    const { error } = await db.from("agents").insert({
       agent37_id: agent.id,
       workspace_id: workspaceId,
       name: agent.name || null,

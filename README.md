@@ -1,9 +1,9 @@
-# Agent37 White-Label Template
+# Agent37 Starter Kit
 
-A white-label, multi-tenant dashboard for managing Hermes/Openclaw agents on the [Agent37](https://www.agent37.com) Cloud API. Fork it and rebrand it
+A full-stack starter for building your own agent app on the [Agent37](https://www.agent37.com) Cloud API — auth, chat, files, integrations, and fleet management, with your choice of Hermes or OpenClaw (or your own image). Fork it, rebrand it, ship it.
 
 <p align="center">
-  <img src="screenshots/overview.png" alt="The white-label dashboard (agents, team, sign-in) plus each agent's own UIs (Hermes chat, file browser)" width="100%" />
+  <img src="screenshots/overview.png" alt="The Agent37 Starter Kit dashboard: a multi-agent fleet plus a per-agent workspace with native chat, files, integrations, and settings" width="100%" />
 </p>
 
 ## Setup

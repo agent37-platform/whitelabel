@@ -11,3 +11,10 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   }
   return data as T;
 }
+
+// Pull the API's { error: { message } } off a non-ok Response for the manual fetch callers
+// (streaming / multipart bodies that can't go through apiFetch), falling back to a status code.
+export async function readApiError(res: Response, fallback: string): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return body?.error?.message || `${fallback} (${res.status})`;
+}

@@ -1,5 +1,5 @@
 import { agent37 } from "@/lib/agent37";
-import { getAgentRow, requireAdmin, requireUser } from "@/lib/auth";
+import { requireAgentAccess } from "@/lib/auth";
 import { ApiError, handleError, json } from "@/lib/http";
 
 type Ctx = { params: Promise<{ id: string; action: string }> };
@@ -17,13 +17,11 @@ export async function POST(_request: Request, { params }: Ctx) {
     const fn = ACTIONS[action as keyof typeof ACTIONS];
     if (!fn) throw new ApiError(404, "not_found", `Unknown action: ${action}`);
 
-    const { supabase, user } = await requireUser();
-    const row = await getAgentRow(supabase, id);
-    await requireAdmin(supabase, row.workspace_id, user.id);
+    const { db } = await requireAgentAccess(id, "admin");
 
     const result = await fn(id);
     if (result.status) {
-      await supabase.rpc("set_agent_status", { p_agent37_id: id, p_status: result.status });
+      await db.from("agents").update({ status: result.status }).eq("agent37_id", id);
     }
 
     return json(result);

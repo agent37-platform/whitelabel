@@ -135,3 +135,78 @@ export interface MergedAgent extends AgentRow {
   ports: Agent["ports"];
   update_available: boolean;
 }
+
+// ---- Agent37 Agents API (data plane: per-instance web chat) ----
+
+// One model the instance's agent can run (GET /v1/models -> data[]). Current Hermes builds report
+// the provider slug as `owned_by` ("anthropic"); the older metered build used `provider`
+// ("custom:agent37"). Read `owned_by ?? provider` so the switcher groups correctly on either.
+export interface AgentModel {
+  id: string;
+  label: string;
+  owned_by?: string;
+  provider?: string;
+  is_default?: boolean;
+}
+
+export interface ModelsResponse {
+  default_model: string | null;
+  default_provider: string | null;
+  data: AgentModel[];
+}
+
+// One message in a conversation's history (GET /v1/sessions/{id}).
+export interface ChatHistoryMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  thinking?: string;
+  created_at: number;
+}
+
+export interface SessionDetail {
+  id: string;
+  agent: string;
+  history: ChatHistoryMessage[];
+}
+
+// One conversation in the instance's session list (GET /v1/sessions -> data[]). Current Hermes
+// builds carry a server-side `title` (settable via PATCH /v1/sessions/{id}) plus a `preview` of
+// the first message and `last_active`/`started_at` timestamps. The rail label is resolved in the
+// sessions route as `title || preview`; ordering is by `last_active`. There is no local sessions
+// table — the Agents API is the source of truth.
+export interface SessionSummary {
+  id: string;
+  title?: string | null;
+  preview?: string | null;
+  last_active?: number | null;
+  started_at?: number | null;
+}
+
+export interface SessionListResponse {
+  data: SessionSummary[];
+}
+
+// ---- Agent37 Agents API file browser (data plane: per-instance /v1/files) ----
+
+// One entry in a directory listing, also returned by every write (PUT/PATCH/POST dir). The
+// `path` is the resolved ABSOLUTE path and is the identity used by every other call. `modified`
+// is mtime in EPOCH MILLISECONDS (Agent API convention); `size` is null for directories.
+export interface FileEntry {
+  name: string;
+  path: string;
+  type: "file" | "directory" | "symlink" | "other";
+  size: number | null;
+  modified: number;
+  hidden: boolean;
+}
+
+// GET /v1/files?path= — one directory level. `parentPath` is null at the filesystem root.
+// `truncated` is true when the directory held more than the 1000-entry cap.
+export interface FileListResponse {
+  path: string;
+  parentPath: string | null;
+  entries: FileEntry[];
+  truncated: boolean;
+}

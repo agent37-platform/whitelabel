@@ -84,6 +84,9 @@ create trigger on_workspace_created
   after insert on public.workspaces
   for each row execute function public.handle_new_workspace();
 
+-- Reads auth.users for member emails, so it stays SECURITY DEFINER. Authorization (caller must be
+-- a member of p_workspace) is enforced by the server BFF (requireMember) before this is called —
+-- the server uses the service-role key, under which auth.uid() is NULL, so the check can't live here.
 create or replace function public.get_workspace_members(p_workspace uuid)
 returns table (user_id uuid, email text, role text, created_at timestamptz)
 language plpgsql
@@ -91,9 +94,6 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.is_workspace_member(p_workspace) then
-    raise exception 'not a member';
-  end if;
   return query
     select m.user_id, u.email::text, m.role, m.created_at
     from public.memberships m
@@ -118,7 +118,9 @@ begin
 end;
 $$;
 
-create or replace function public.accept_invitation(p_token uuid)
+-- Takes the caller's id as p_user (the server passes the verified session user.id): under the
+-- service-role key auth.uid() is NULL, so it can't be read from the JWT here.
+create or replace function public.accept_invitation(p_token uuid, p_user uuid)
 returns uuid
 language plpgsql
 security definer
@@ -135,30 +137,10 @@ begin
     raise exception 'invitation expired';
   end if;
   insert into public.memberships (workspace_id, user_id, role)
-  values (v_inv.workspace_id, auth.uid(), v_inv.role)
+  values (v_inv.workspace_id, p_user, v_inv.role)
   on conflict (workspace_id, user_id) do update set role = excluded.role;
   delete from public.invitations where token = p_token;
   return v_inv.workspace_id;
-end;
-$$;
-
-create or replace function public.set_agent_status(p_agent37_id text, p_status text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_ws uuid;
-begin
-  select workspace_id into v_ws from public.agents where agent37_id = p_agent37_id;
-  if v_ws is null then
-    return;
-  end if;
-  if not public.is_workspace_member(v_ws) then
-    raise exception 'not a member';
-  end if;
-  update public.agents set status = p_status where agent37_id = p_agent37_id;
 end;
 $$;
 
@@ -231,14 +213,16 @@ drop policy if exists agents_delete on public.agents;
 create policy agents_delete on public.agents
   for delete using (public.is_workspace_admin(workspace_id));
 
-grant usage on schema public to anon, authenticated;
+-- Access model: clients (the browser's anon key + a user's JWT, i.e. the anon/authenticated roles)
+-- get NO direct table or data-RPC access. Every read and write goes through this app's Next.js
+-- server using the service-role key, which authorizes each call in TypeScript (src/lib/auth.ts)
+-- first. The RLS policies above are kept enabled only as a backstop — they're dormant because the
+-- client roles have no grants to reach the tables, and the service role bypasses RLS.
+grant usage on schema public to anon, authenticated, service_role;
 grant select, insert, update, delete
   on public.workspaces, public.memberships, public.invitations, public.agents
-  to authenticated;
+  to service_role;
 
-grant execute on function public.is_workspace_member(uuid)            to authenticated;
-grant execute on function public.is_workspace_admin(uuid)             to authenticated;
-grant execute on function public.get_workspace_members(uuid)          to authenticated;
-grant execute on function public.get_invitation(uuid)                 to authenticated;
-grant execute on function public.accept_invitation(uuid)              to authenticated;
-grant execute on function public.set_agent_status(text, text)         to authenticated;
+grant execute on function public.get_workspace_members(uuid)          to service_role;
+grant execute on function public.get_invitation(uuid)                 to service_role;
+grant execute on function public.accept_invitation(uuid, uuid)        to service_role;

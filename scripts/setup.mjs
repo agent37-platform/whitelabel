@@ -148,6 +148,23 @@ function pickPublicKey(keys) {
   return safe ? val(safe) : null;
 }
 
+// The privileged service-role secret (legacy `service_role` JWT or the newer `sb_secret_…` key).
+// Server-only — it bypasses RLS, so it never gets a NEXT_PUBLIC_ prefix.
+function pickServiceKey(keys) {
+  if (!Array.isArray(keys)) return null;
+  const val = (k) => k.api_key || k.apiKey || k.secret || (typeof k === "string" ? k : null);
+  const svc = keys.find(
+    (k) =>
+      k.name === "service_role" ||
+      k.id === "service_role" ||
+      k.type === "service_role" ||
+      k.type === "secret" ||
+      k.name === "secret" ||
+      (typeof val(k) === "string" && val(k).startsWith("sb_secret_"))
+  );
+  return svc && val(svc) ? val(svc) : null;
+}
+
 async function waitHealthy(call, ref) {
   const deadlineMs = Date.now() + 6 * 60 * 1000;
   let lastStatus = "";
@@ -251,21 +268,26 @@ async function configureAuth(call, ref, siteUrl) {
     site_url: siteUrl,
     uri_allow_list: allow.join(","),
     external_email_enabled: true,
+    // Open signup, no email verification: signUp returns a session immediately,
+    // so the login form can register-and-go with zero inbox round-trips.
+    mailer_autoconfirm: true,
   });
   ok(`Auth Site URL set to ${siteUrl}`);
   info(`Redirect allow-list: ${allow.join(", ")}`);
 }
 
 function printHelp() {
-  log(`${bold("agent37-whitelabel setup")}
+  log(`${bold("agent37-starter-kit setup")}
 
 Usage: npm run setup [-- options]
 
 Reads .env.local and finishes the Supabase setup for you using
 SUPABASE_ACCESS_TOKEN (a personal access token):
   - runs the database migration(s)
-  - configures the magic-link Site URL + redirect allow-list
-  - fills in NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
+  - configures the Site URL + redirect allow-list and turns on
+    email + password auth (open signup, no email verification)
+  - fills in NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY /
+    SUPABASE_SERVICE_ROLE_KEY (server-only)
 
 If NEXT_PUBLIC_SUPABASE_URL is blank, it creates a free project for you.
 
@@ -287,7 +309,7 @@ async function main() {
     return;
   }
 
-  log(bold("Setting up agent37-whitelabel\n"));
+  log(bold("Setting up agent37-starter-kit\n"));
 
   if (!fs.existsSync(ENV_FILE)) {
     if (!fs.existsSync(ENV_EXAMPLE)) die("Missing .env.example — are you in the project root?");
@@ -321,7 +343,6 @@ async function main() {
   const siteUrl = (get(env, "NEXT_PUBLIC_SITE_URL") || "http://localhost:3000").replace(/\/$/, "");
 
   let ref = process.env.SUPABASE_PROJECT_REF || refFromUrl(get(env, "NEXT_PUBLIC_SUPABASE_URL"));
-  let createdDbPass = null;
 
   if (ref) {
     step(`Using Supabase project ${bold(ref)}`);
@@ -346,48 +367,77 @@ async function main() {
     const orgs = await call("GET", "/v1/organizations");
     if (!Array.isArray(orgs) || orgs.length === 0)
       die("Your Supabase account has no organizations — create one at https://supabase.com/dashboard first.");
+
+    // Guidance shared by every "couldn't create" path: list the real orgs with the exact override
+    // to target each, so a multi-org account never has to guess.
+    const orgList = orgs.map((o) => `      • ${o.name || o.slug || o.id}   →  SUPABASE_ORG=${o.slug || o.id}`).join("\n");
+    const pickHint =
+      `Re-run ${bold("npm run setup")} after choosing one:\n` +
+      `  • Target a specific org — set one of these:\n${orgList}\n` +
+      `  • Or reuse an existing project — paste its URL into NEXT_PUBLIC_SUPABASE_URL in .env.local`;
+
     const wantOrg = process.env.SUPABASE_ORG;
-    const org = wantOrg ? orgs.find((o) => o.id === wantOrg || o.slug === wantOrg) || orgs[0] : orgs[0];
+    if (wantOrg && !orgs.some((o) => o.id === wantOrg || o.slug === wantOrg)) {
+      die(`No organization "${wantOrg}" is visible to this token.`, pickHint);
+    }
+    // Multiple orgs and none chosen: don't guess. Picking the wrong one (e.g. a shared company org
+    // where this token can't create projects) is exactly what produces the confusing 403.
+    if (!wantOrg && orgs.length > 1) {
+      die("Your Supabase account belongs to more than one organization — tell setup which to use.", pickHint);
+    }
+
+    const org = wantOrg ? orgs.find((o) => o.id === wantOrg || o.slug === wantOrg) : orgs[0];
     const orgSlug = org.slug || org.id;
     const region = (process.env.SUPABASE_REGION || "americas").toLowerCase();
     info(`Organization: ${org.name || orgSlug}   Region: ${region}`);
     log(`  ${dim("Creating project (this takes a minute or two)…")}`);
-    let project, dbPass;
+    let project;
     try {
-      ({ project, dbPass } = await createProject(call, { name: "agent37-whitelabel", orgSlug, region }));
+      ({ project } = await createProject(call, { name: "agent37-starter-kit", orgSlug, region }));
     } catch (e) {
-      if (/maximum limits|free project|project limit/i.test(e.message || "")) {
+      const atLimit = /maximum limits|free project|project limit/i.test(e.message || "");
+      if (atLimit || e.status === 403) {
         die(
-          "Your Supabase account is at its free-project limit, so setup can't create a new one.",
-          `Pick one, then re-run ${bold("npm run setup")}:\n` +
-            `  • Use an existing project — paste its URL into NEXT_PUBLIC_SUPABASE_URL in .env.local\n` +
-            `  • Free up a slot — delete or pause a project at ${bold("https://supabase.com/dashboard")}\n` +
-            `  • Use another org that has room — set SUPABASE_ORG=<org-slug>`
+          atLimit
+            ? `Organization "${org.name || orgSlug}" is at its free-project limit, so setup can't create one there.`
+            : `This token can't create a project in organization "${org.name || orgSlug}" (403) — likely a shared org, or one out of free slots.`,
+          `${pickHint}\n  • Or free up a slot — delete/pause a project at ${bold("https://supabase.com/dashboard")}`
         );
       }
       throw e;
     }
     ref = project.ref || project.id;
-    createdDbPass = dbPass;
     ok(`Created project ${bold(ref)}`);
-    // Record it immediately so a crash mid-provision can't orphan the project —
-    // a re-run then configures this one instead of creating a second.
+    // Record the URL immediately so a crash mid-provision can't orphan the project — a re-run then
+    // configures this one instead of creating a second. The generated DB password is NOT stored:
+    // nothing in this app uses a direct Postgres connection (all DB access is via the service-role
+    // key over HTTPS), so reset it in the Supabase dashboard if you ever want raw DB access.
     setEnv(env, "NEXT_PUBLIC_SUPABASE_URL", `https://${ref}.supabase.co`);
-    setEnv(env, "SUPABASE_DB_PASSWORD", createdDbPass);
     saveEnv(env);
     ok("Wrote NEXT_PUBLIC_SUPABASE_URL");
     await waitHealthy(call, ref);
   }
 
   step("Filling in Supabase credentials");
-  if (isBlank(get(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY"))) {
+  const needAnon = isBlank(get(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY"));
+  const needService = isBlank(get(env, "SUPABASE_SERVICE_ROLE_KEY"));
+  if (needAnon || needService) {
+    // One reveal fetches both the public (anon) and the secret (service-role) key.
     const keys = await call("GET", `/v1/projects/${ref}/api-keys?reveal=true`);
-    const anon = pickPublicKey(keys);
-    if (!anon) die("Could not read the project's anon/publishable key from the API.");
-    setEnv(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY", anon);
-    ok("Wrote NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    if (needAnon) {
+      const anon = pickPublicKey(keys);
+      if (!anon) die("Could not read the project's anon/publishable key from the API.");
+      setEnv(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY", anon);
+      ok("Wrote NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    }
+    if (needService) {
+      const svc = pickServiceKey(keys);
+      if (!svc) die("Could not read the project's service-role key from the API.");
+      setEnv(env, "SUPABASE_SERVICE_ROLE_KEY", svc);
+      ok("Wrote SUPABASE_SERVICE_ROLE_KEY (server-only — the app reads/writes the DB with this)");
+    }
   } else {
-    info("NEXT_PUBLIC_SUPABASE_ANON_KEY already set — leaving it.");
+    info("Supabase keys already set — leaving them.");
   }
   saveEnv(env);
 
@@ -430,4 +480,4 @@ if (invokedDirectly()) {
   });
 }
 
-export { loadEnv, setEnv, saveEnv, unquote, refFromUrl, pickPublicKey, isBlank };
+export { loadEnv, setEnv, saveEnv, unquote, refFromUrl, pickPublicKey, pickServiceKey, isBlank };

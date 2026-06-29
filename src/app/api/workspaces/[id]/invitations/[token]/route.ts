@@ -6,10 +6,10 @@ type Ctx = { params: Promise<{ id: string; token: string }> };
 export async function DELETE(_request: Request, { params }: Ctx) {
   try {
     const { id, token } = await params;
-    const { supabase, user } = await requireUser();
-    await requireAdmin(supabase, id, user.id);
+    const { db, user } = await requireUser();
+    await requireAdmin(db, id, user.id);
 
-    const { error } = await supabase
+    const { error } = await db
       .from("invitations")
       .delete()
       .eq("token", token)

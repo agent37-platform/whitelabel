@@ -7,15 +7,15 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, { params }: Ctx) {
   try {
     const { id } = await params;
-    const { supabase, user } = await requireUser();
-    const role = await requireMember(supabase, id, user.id);
+    const { db, user } = await requireUser();
+    const role = await requireMember(db, id, user.id);
 
-    const { data: members, error } = await supabase.rpc("get_workspace_members", { p_workspace: id });
+    const { data: members, error } = await db.rpc("get_workspace_members", { p_workspace: id });
     if (error) throw new ApiError(500, "db_error", error.message);
 
     let invitations: Invitation[] = [];
     if (role === "admin") {
-      const { data: inv } = await supabase
+      const { data: inv } = await db
         .from("invitations")
         .select("*")
         .eq("workspace_id", id)
@@ -32,10 +32,10 @@ export async function GET(_request: Request, { params }: Ctx) {
 export async function POST(request: Request, { params }: Ctx) {
   try {
     const { id } = await params;
-    const { supabase, user } = await requireUser();
-    await requireAdmin(supabase, id, user.id);
+    const { db, user } = await requireUser();
+    await requireAdmin(db, id, user.id);
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("invitations")
       .insert({ workspace_id: id, role: "admin", created_by: user.id })
       .select("token")

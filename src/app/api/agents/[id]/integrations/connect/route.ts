@@ -1,5 +1,5 @@
 import { agent37 } from "@/lib/agent37";
-import { getAgentRow, requireMember, requireUser } from "@/lib/auth";
+import { requireAgentAccess } from "@/lib/auth";
 import { ApiError, handleError, json, readJson } from "@/lib/http";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -7,9 +7,9 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, { params }: Ctx) {
   try {
     const { id } = await params;
-    const { supabase, user } = await requireUser();
-    const row = await getAgentRow(supabase, id);
-    await requireMember(supabase, row.workspace_id, user.id);
+    // Connecting an external account to a shared agent is a capability grant — admin-only, like
+    // every other agent mutation.
+    await requireAgentAccess(id, "admin");
 
     const { toolkit } = await readJson<{ toolkit?: string }>(request);
     if (!toolkit || typeof toolkit !== "string") {
