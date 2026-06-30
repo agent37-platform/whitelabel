@@ -6,10 +6,6 @@ A full-stack starter for building your own agent app on the [Agent37](https://ww
   <img src="screenshots/demo.gif" alt="Demo of the Agent37 Starter Kit dashboard and agent workspace" width="100%" />
 </p>
 
-<p align="center">
-  <img src="screenshots/overview.png" alt="The Agent37 Starter Kit dashboard: a multi-agent fleet plus a per-agent workspace with native chat, files, integrations, and settings" width="100%" />
-</p>
-
 ## Setup
 
 **1. Get two keys** (both behind a login, so only you can fetch them):
